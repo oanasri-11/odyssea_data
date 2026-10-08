@@ -1,72 +1,62 @@
-# Riverload Prediction Model
+# Riverload C1 — Minimum Depth (Dmin) Prediction Model
 
 ## Overview
-This project predicts the minimum river depth (Dmin) a vessel will encounter on future route legs using historical gauge and discharge data.
+This project addresses the **RIVERLOAD C1** challenge: forecasting the minimum river depth ($D_{min}$) a container barge will encounter on its journey along the Rhine. By training on 21 days of historical water gauge levels and discharge rates up to an `issue_time`, the model predicts the lower tail quantiles of depth ($D_{min}$) for specific routes, departure slots, and journey legs 2 to 11 days into the future.
 
-## Mermaid Diagram
+---
+
+## Workflow & System Architecture
 
 ```mermaid
 flowchart TD
-    %% Past data flow
-    subgraph Past["Past"]
-        WaterLevels[Water levels<br/>21 gauges] -->| | Past
-        Discharge[Discharge<br/>16 series] -->| | Past
-        Past --> issue_time[issue_time]
-        issue_time --> FEATURES_X[FEATURES X]
-        FEATURES_X --> ML_MODEL[ML MODEL]
-        ML_MODEL --> FUTURE_Dmin_DIST[FUTURE Dmin DISTRIBUTION]
-        FUTURE_Dmin_DIST --> q05[q05]
-        FUTURE_Dmin_DIST --> q10[q10]
-        FUTURE_Dmin_DIST --> q25[q25]
-        FUTURE_Dmin_DIST --> q50[q50]
+    %% Past Historical Data & Feature Engineering
+    subgraph PastData["Past Data Inputs (up to issue_time)"]
+        WL["Water Levels<br/>(21 Gauges)"]
+        DC["Discharge Data<br/>(16 Flow Series)"]
     end
 
-    %% River load journey
-    subgraph Journey["Future Journey"]
-        Riverload_C1[RIVERLOAD C1] --> Barge[BARGE IN ROTTERDAM]
-        Barge --> Junction{WAAL / LEK}
-        Junction -->|WAAL| Waal[WAAL]
-        Junction -->|LEK| Lek[LEK]
-        Waal --> DepartureSlot[Departure Slot<br/>0...24]
-        Lek --> DepartureSlot
-        DepartureSlot --> Leg[Leg]
-        Leg --> FutureJourney[FUTURE JOURNEY]
-        FutureJourney --> RiverSegments[River segments<br/>Left & Right]
-        RiverSegments --> Depths[Depth layers<br/>Depth 1, Depth 2, ...]
-        Depths --> Dmin[Dmin<br/>= minimum depth]
-        Dmin --> Q05[q05]
-        Dmin --> Q10[q10]
-        Dmin --> Q25[q25]
-        Dmin --> Q50[q50]
+    subgraph Pipeline["Machine Learning Pipeline"]
+        FE["Feature Engineering<br/>(Lags, Upstream Diffs, Trends)"]
+        Model["Quantile ML Model<br/>(LightGBM / CatBoost / TFT)"]
+        Dist["Predicted Depth Distribution<br/>(Future Dmin)"]
     end
 
-    %% Style definitions
-    classDef past fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef journey fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef process fill:#cfc,stroke:#333,stroke-width:2px;
-    classDef data fill:#ffc,stroke:#333,stroke-width:2px;
-    class Past,FEATURES_X,ML_MODEL,FUTURE_Dmin_DIST process;
-    class WaterLevels,Discharge data;
-    class Riverload_C1,Barge,Waal,Lek,DepartureSlot,Leg,FutureJourney,RiverSegments,Depths,Dmin journey;
-    class q05,q10,q25,q50,data;
-```
+    WL --> FE
+    DC --> FE
+    FE --> Model
+    Model --> Dist
 
-## Problem Statement
-Predict the minimum depth (Dmin) a vessel will encounter for each route, departure slot, and leg using available river information up to issue_time.
+    Dist --> Q05_Out["dmin_q05_cm<br/>(95% safe)"]
+    Dist --> Q10_Out["dmin_q10_cm<br/>(90% safe)"]
+    Dist --> Q25_Out["dmin_q25_cm<br/>(75% safe)"]
+    Dist --> Q50_Out["dmin_q50_cm<br/>(Median)"]
 
-## Input
-Historical hourly data for 21 days before issue_time, including 21 gauge series and 16 discharge series, plus scenario, route, departure, and leg information.
+    %% Journey Logic & Ground Truth
+    subgraph Journey["Future Journey Logic (2-11 Days Ahead)"]
+        Barge["Barge in Rotterdam"] --> RouteChoice{"Route Selection"}
+        RouteChoice -->|Via Waal| WaalRoute["Waal Route"]
+        RouteChoice -->|Via Lek| LekRoute["Lek Route"]
 
-## Output / Labels
-Four quantiles for Dmin:
-- q05, q10, q25, q50
+        WaalRoute --> DepSlot["Departure Slot<br/>(0 to 24 | +2 to +8 days)"]
+        LekRoute --> DepSlot
 
-## Type of ML
-Supervised learning + time-series forecasting + quantile regression
+        DepSlot --> LegSeg["Leg Segmentation<br/>(Rotterdam → Duisburg → etc.)"]
+        LegSeg --> Timetable["Hourly River Segments<br/>(En-route Timetable)"]
+        Timetable --> TargetCalc["Dmin Computation<br/>min(Segment Depths)"]
+    end
 
-## Metric
-Mean Pinball Loss
+    TargetCalc -. Evaluated Against .-> Dist
 
+    %% Styling
+    classDef inputs fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#01579b;
+    classDef mlProcess fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px,color:#1b5e20;
+    classDef outputs fill:#fff3e0,stroke:#f57c00,stroke-width:1.5px,color:#e65100;
+    classDef domain fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+
+    class WL,DC inputs;
+    class FE,Model,Dist mlProcess;
+    class Q05_Out,Q10_Out,Q25_Out,Q50_Out outputs;
+    class Barge,RouteChoice,WaalRoute,LekRoute,DepSlot,LegSeg,Timetable,TargetCalc domain;
 ## Goal
 Reduce Pinball Loss, focusing on accurate prediction of the lower tail of Dmin distribution.
 
