@@ -57,8 +57,3 @@ flowchart TD
     class FE,Model,Dist mlProcess;
     class Q05_Out,Q10_Out,Q25_Out,Q50_Out outputs;
     class Barge,RouteChoice,WaalRoute,LekRoute,DepSlot,LegSeg,Timetable,TargetCalc domain;
-## Goal
-Reduce Pinball Loss, focusing on accurate prediction of the lower tail of Dmin distribution.
-
-## Main Challenge
-The future is relatively distant, water waves move through the river, and Dmin is determined by the weakest point along the journey.
