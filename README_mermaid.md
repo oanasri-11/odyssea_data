@@ -72,36 +72,3 @@ Reduce Pinball Loss, focusing on accurate prediction of the lower tail of Dmin d
 
 ## Main Challenge
 The future is relatively distant, water waves move through the river, and Dmin is determined by the weakest point along the journey.
-
-
-
-
-Problem
-
-توقع أقل عمق ملاحي مستقبلي Dmin ستواجهه الباخرة لكل route وdeparture slot وleg، باستخدام معلومات النهر المتاحة حتى issue_time.
-
-Input
-
-بيانات تاريخية hourly لمدة 21 يومًا قبل issue_time، تشمل 21 gauge و16 discharge series، بالإضافة إلى معلومات السيناريو والـroute والـdeparture والـleg.
-
-Output / Labels
-
-أربعة quantiles لـDmin:
-
-q05, q10, q25, q50
-
-Type of ML
-
-Supervised learning + time-series forecasting + quantile regression
-
-Metric
-
-Mean Pinball Loss
-
-Goal
-
-تقليل Pinball Loss، مع التركيز خصوصًا على التنبؤ الصادق بالطرف المنخفض من توزيع Dmin.
-
-Main difficulty
-
-المستقبل بعيد نسبيًا، موجات المياه تتحرك عبر النهر، وDmin تحدده أضعف نقطة في الرحل
